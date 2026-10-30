@@ -13,6 +13,8 @@ npm run preview    # 按线上子路径本地预览打包结果
 
 在线地址：https://ahjdzx.github.io/chuhe-hanjie/ —— 推送到 `main` 后由 GitHub Actions（`.github/workflows/deploy.yml`）先跑测试、再构建并发布到 GitHub Pages。
 
+部署到 Cloudflare Pages（站点在根路径）：构建命令 `npm run build:root`，输出目录 `dist`，环境变量 `NODE_VERSION=22`。
+
 ## 分层（严格单向）
 
 ```

@@ -9,7 +9,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "node test/engine.test.mjs && node test/ai.test.mjs",
-    "bench": "node test/strength.mjs 6 3"
+    "bench": "node test/strength.mjs 6 3",
+    "build:root": "BASE_PATH=/ vite build"
   },
   "dependencies": {
     "three": "^0.186.1"
