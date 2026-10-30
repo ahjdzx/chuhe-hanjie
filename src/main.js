@@ -68,7 +68,7 @@ function newGame(s) {
 
 // ---- 界面 ---------------------------------------------------------------------------
 function setWin(p) {
-  $("win-fill").style.width = `${(p * 100).toFixed(1)}%`;
+  $("win-fill").style.transform = `scaleX(${p.toFixed(3)})`;
   $("win-red").textContent = `红 ${Math.round(p * 100)}%`;
   $("win-black").textContent = `黑 ${Math.round((1 - p) * 100)}%`;
 }

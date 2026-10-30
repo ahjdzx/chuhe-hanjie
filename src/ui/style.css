@@ -81,7 +81,7 @@ output { color: var(--ink); text-align: right; font-variant-numeric: tabular-num
 
 #winbar { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; width: min(520px, 60vw); }
 #winbar .bar { position: relative; flex: 1; height: 12px; border-radius: 99px; overflow: hidden; background: #2b3540; border: 1px solid var(--line); }
-#winbar .fill { position: absolute; inset: 0 auto 0 0; width: 50%; background: linear-gradient(90deg, #a52a1f, var(--red)); transition: width 0.8s cubic-bezier(0.3, 0.7, 0.2, 1); }
+#winbar .fill { position: absolute; inset: 0; transform: scaleX(0.5); transform-origin: left center; background: linear-gradient(90deg, #a52a1f, var(--red)); transition: transform 0.8s cubic-bezier(0.3, 0.7, 0.2, 1); }
 #winbar .mid { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: rgba(255, 255, 255, 0.4); }
 #winbar .side { font-size: 13px; font-variant-numeric: tabular-nums; min-width: 64px; }
 #winbar .red { color: var(--red); text-align: right; }
