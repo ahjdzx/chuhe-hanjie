@@ -1,0 +1,19 @@
+{
+  "name": "chuhe-hanjie",
+  "version": "0.1.0",
+  "private": true,
+  "description": "楚河汉界：会自己下完一整盘中国象棋的 3D 桌面对战",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node test/engine.test.mjs && node test/ai.test.mjs"
+  },
+  "dependencies": {
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "vite": "^8.3.5"
+  }
+}

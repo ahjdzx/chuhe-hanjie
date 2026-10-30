@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>楚河汉界 · 桌面对战</title>
+    <link rel="stylesheet" href="/src/ui/style.css" />
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+
+    <div id="winbar" aria-label="胜率">
+      <span class="side red" id="win-red">红 50%</span>
+      <div class="bar"><div class="fill" id="win-fill"></div><div class="mid"></div></div>
+      <span class="side black" id="win-black">黑 50%</span>
+    </div>
+
+    <section class="panel left" id="controls">
+      <header>
+        <h1>楚河汉界</h1>
+        <span id="selftest" class="badge ok" title="规则引擎自检">自检 ✓</span>
+        <button id="btn-fold" class="fold" title="收起/展开设置">收起</button>
+      </header>
+      <div class="row seed">
+        <span>种子</span><code id="seed">------</code>
+        <button id="btn-new">新种子</button>
+        <button id="btn-replay">重放该种子</button>
+      </div>
+      <div class="row">
+        <button id="btn-pause" class="primary">暂停</button>
+        <label class="check"><input type="checkbox" id="auto-next" checked />打完自动开新局</label>
+      </div>
+      <div class="more">
+      <label class="slider">速度 <input type="range" id="speed" min="0.25" max="3" step="0.05" value="1" /><output id="speed-out">1.0×</output></label>
+      <label class="slider">温度 <input type="range" id="temp" min="0" max="1" step="0.01" value="0.35" /><output id="temp-out">0.35</output></label>
+      <div class="row">
+        <label>搜索深度
+          <select id="depth"><option value="2">2</option><option value="3" selected>3</option></select>
+        </label>
+        <label>镜头
+          <select id="camera"><option value="auto" selected>自动导播</option><option value="free">自由视角</option><option value="top">俯视</option></select>
+        </label>
+      </div>
+      <div class="row">
+        <label>红方 <select id="ctl-r"><option value="ai" selected>电脑</option><option value="human">我来下</option></select></label>
+        <label>黑方 <select id="ctl-b"><option value="ai" selected>电脑</option><option value="human">我来下</option></select></label>
+      </div>
+      <p class="hint">右键拖动或滚轮可随时切到自由视角。轮到你时，点己方棋子再点目标点。空格暂停。</p>
+      </div>
+    </section>
+
+    <section class="panel right" id="record">
+      <div class="armies">
+        <div class="army red"><b>红方</b><span id="army-r">—</span></div>
+        <div class="army black"><b>黑方</b><span id="army-b">—</span></div>
+      </div>
+      <div id="status" class="status">准备开局</div>
+      <ol id="moves" class="moves"></ol>
+    </section>
+
+    <div id="comment" class="comment"><span id="comment-text">桌上的两支军队已经列好阵</span><small id="comment-sub"></small></div>
+    <div id="banner" class="banner hidden"><div class="title" id="banner-title"></div><div class="sub" id="banner-sub"></div></div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
