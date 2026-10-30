@@ -7,8 +7,11 @@ npm install
 npm run dev        # 开发服务器
 npm test           # 规则引擎 + AI 测试（Node，无需浏览器）
 npm run bench      # 棋力对比：当前引擎 vs test/baseline 里冻结的旧引擎，12 盘
-npm run build      # 打包到 dist/
+npm run build      # 打包到 dist/（站点路径 /chuhe-hanjie/，可用 BASE_PATH 覆盖）
+npm run preview    # 按线上子路径本地预览打包结果
 ```
+
+在线地址：https://ahjdzx.github.io/chuhe-hanjie/ —— 推送到 `main` 后由 GitHub Actions（`.github/workflows/deploy.yml`）先跑测试、再构建并发布到 GitHub Pages。
 
 ## 分层（严格单向）
 
