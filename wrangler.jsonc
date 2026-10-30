@@ -1,0 +1,9 @@
+// Cloudflare Workers 静态资源部署配置：把 dist/ 原样发布，不需要写任何 Worker 代码。
+// 构建命令：npm run build:root（站点在根路径）
+{
+  "name": "chuhe-hanjie",
+  "compatibility_date": "2025-10-01",
+  "assets": {
+    "directory": "./dist"
+  }
+}
