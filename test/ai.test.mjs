@@ -1,4 +1,4 @@
-import { runSync, createMatch, decide, commit } from "../src/game/match.js";
+import { runSync, createMatch, decide, commit, startTurn } from "../src/game/match.js";
 import { searchSync } from "../src/ai/search.js";
 import * as X from "../src/engine/xiangqi.js";
 
@@ -56,6 +56,38 @@ console.log("   ZX9Q2K 性格:", b.armies.r.persona.name, b.armies.r.book, "/", 
 console.log("   SEED01 前 12 步:", a.log.slice(0, 12).map((e) => e.notation).join(" "));
 console.log("   ZX9Q2K 前 12 步:", b.log.slice(0, 12).map((e) => e.notation).join(" "));
 console.log("   解说示例:", a.log.slice(0, 40).map((e) => e.comment).filter((c, i, arr) => arr.indexOf(c) === i).slice(0, 8).join(" | "));
+
+console.log("精确重放（中途改设置 + 人类走子）");
+{
+  // 模拟一个用户：第 6、15 步前改温度和深度，第 3、8、11 步自己下（总挑第一个合法走法）
+  const play = (match, live, humanAt) => {
+    while (!match.result.over && match.log.length < 40) {
+      const ply = match.log.length;
+      if (ply === 6) live = { temperature: 0.9, depth: 2 };
+      if (ply === 15) live = { temperature: 0.1, depth: 3 };
+      const { scripted } = startTurn(match, live);
+      if (scripted) {
+        commit(match, scripted);
+        continue;
+      }
+      if (humanAt.includes(ply)) {
+        commit(match, { move: X.legalMoves(match.state.board, match.state.side)[0], kind: "human" });
+        continue;
+      }
+      const it = decide(match);
+      let r = it.next();
+      while (!r.done) r = it.next();
+      commit(match, r.value);
+    }
+    return match;
+  };
+  const original = play(createMatch("REPLAY", { temperature: 0.35, depth: 3 }), { temperature: 0.35, depth: 3 }, [3, 8, 11]);
+  // 重放时界面已经是别的设置、也没人再手动下，全靠脚本
+  const again = play(createMatch("REPLAY", { temperature: 0.7, depth: 2 }, original.script), { temperature: 0.7, depth: 2 }, []);
+  ok(line(original) === line(again), `重放与原局逐步一致（${original.log.length} 步，脚本 ${original.script.events.length} 条记录）`);
+  const naive = runSync("REPLAY", { temperature: 0.35, depth: 3 }, 40);
+  ok(line(naive) !== line(original), "不带脚本直接重放种子会走出不同的棋（说明脚本确实起作用）");
+}
 
 console.log("深度 3 单步耗时（中局）");
 {

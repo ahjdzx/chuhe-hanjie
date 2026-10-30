@@ -1,7 +1,7 @@
 // 总控：规则引擎决定，AI 选择，演出层表演，导播拍摄。各层只通过走法记录交流。
 import * as THREE from "three";
 import { selfTest, legalMoves, fileOf, rankOf, sq } from "./engine/xiangqi.js";
-import { createMatch, decide, commit } from "./game/match.js";
+import { createMatch, decide, commit, startTurn, branch } from "./game/match.js";
 import { makeRng, freshSeed } from "./ai/rng.js";
 import { createWorld, toWorld } from "./render/world.js";
 import { Stage } from "./sim/show.js";
@@ -23,6 +23,7 @@ const canvas = $("scene");
 const { renderer, scene, camera, trays, pickPlane } = createWorld(canvas);
 const stage = new Stage(scene, camera, trays, makeRng("init"));
 const director = new Director(camera, canvas);
+director.obstacles = () => [...stage.actors.values()];
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
 function resize() {
@@ -47,17 +48,20 @@ let thinker = null;
 let thinkStart = 0;
 let overTimer = 0;
 let ready = null;
+const camDir = new THREE.Vector3();
+let windYaw = 0;
 
-function newGame(s) {
+function newGame(s, script = null) {
   seed = s;
-  match = createMatch(seed, { ...settings });
+  match = createMatch(seed, { ...settings }, script);
+  if (script) showSettings(match.settings);
   stage.reset(match.state.board, makeRng(seed).fork("show"));
   $("seed").textContent = seed;
   $("moves").innerHTML = "";
   $("army-r").textContent = `${match.armies.r.persona.name} · 偏好${match.armies.r.book}`;
   $("army-b").textContent = `${match.armies.b.persona.name} · 偏好${match.armies.b.book}`;
   setWin(0.5);
-  say(`新的一局，种子 ${seed}`, `红方 ${match.armies.r.persona.name}，黑方 ${match.armies.b.persona.name}`);
+  say(script ? `重放种子 ${seed}` : `新的一局，种子 ${seed}`, script && script.events.length ? `按原局的 ${script.events.length} 处设置改动和你的走法精确重放` : `红方 ${match.armies.r.persona.name}，黑方 ${match.armies.b.persona.name}`);
   $("banner").classList.add("hidden");
   thinker = null;
   ready = null;
@@ -104,7 +108,23 @@ function addMove(rec) {
 }
 
 $("btn-new").onclick = () => newGame(freshSeed());
-$("btn-replay").onclick = () => newGame(seed);
+$("btn-replay").onclick = () => newGame(seed, match.script);
+
+// 界面显示某组设置（重放时跟随原局）
+function showSettings(st) {
+  settings.temperature = st.temperature;
+  settings.depth = st.depth;
+  $("temp").value = String(st.temperature);
+  $("temp-out").textContent = st.temperature.toFixed(2);
+  $("depth").value = String(st.depth);
+}
+// 重放途中用户自己改了东西：从这里起按新的来
+function userChanged() {
+  if (match?.replay) {
+    branch(match);
+    status("已偏离重放，从这里起按你的设置继续");
+  }
+}
 $("btn-pause").onclick = () => setPaused(!paused);
 $("btn-fold").onclick = () => {
   const panel = $("controls");
@@ -123,17 +143,18 @@ $("speed").oninput = (e) => {
 $("temp").oninput = (e) => {
   settings.temperature = Number(e.target.value);
   $("temp-out").textContent = settings.temperature.toFixed(2);
-  if (match) match.settings.temperature = settings.temperature;
+  userChanged(); // 新设置从下一回合开始生效，并记进对局脚本
 };
 $("depth").onchange = (e) => {
   settings.depth = Number(e.target.value);
-  if (match) match.settings.depth = settings.depth;
+  userChanged();
 };
 $("camera").onchange = (e) => director.setMode(e.target.value);
 director.onUserTakeover = (mode) => ($("camera").value = mode);
 for (const c of ["r", "b"]) {
   $("ctl-" + c).onchange = (e) => {
     control[c] = e.target.value;
+    userChanged();
     // 接管：如果这一方正在思考或等待，重新开始这一回合
     if (match && match.state.side === c && (phase === "think" || phase === "ready" || phase === "human")) {
       thinker = null;
@@ -201,7 +222,19 @@ canvas.addEventListener("pointerdown", (e) => {
 function beginTurn() {
   if (match.result.over) return finish();
   const side = match.state.side;
-  if (control[side] === "human") {
+  const replaying = !!match.replay;
+  const { scripted } = startTurn(match, { ...settings });
+  if (replaying) showSettings(match.settings);
+  if (scripted) {
+    // 重放原局里人类下的那一步
+    status("重放：当时你下的这一步");
+    ready = { choice: scripted, at: performance.now() + 700 / speed };
+    phase = "ready";
+    return;
+  }
+  if (replaying && !match.replay) status("重放结束，接着按当前设置下");
+  // 重放进行中：原局由电脑下的步照样交给电脑，保证逐步一致
+  if (control[side] === "human" && !match.replay) {
     phase = "human";
     status(`轮到你走${side === "r" ? "红" : "黑"}方：点己方棋子，再点目标点`);
     return;
@@ -227,7 +260,7 @@ function stepThinker(budget) {
 function play(choice) {
   const rec = commit(match, choice);
   addMove(rec);
-  say(rec.comment, rec.kind === "book" ? "开局库" : rec.kind === "blunder" ? "高温下的随机失误" : rec.kind === "soft" ? "温度让它选了次优的一步" : "");
+  say(rec.comment, rec.replayed ? "重放你当时的走法" : rec.kind === "book" ? "开局库" : rec.kind === "blunder" ? "高温下的随机失误" : rec.kind === "soft" ? "温度让它选了次优的一步" : "");
   setWin(match.winRate);
   status("");
   phase = "show";
@@ -283,6 +316,13 @@ function frame(now) {
       if (overTimer <= 0) newGame(freshSeed());
     }
   }
+  // 风向：垂直于镜头的水平视线，选和上一帧接近的那一侧，缓慢变化
+  camera.getWorldDirection(camDir);
+  const wa = Math.atan2(camDir.x, camDir.z); // 旗面 +X 轴转到这个朝向时与视线垂直，旗面正对镜头
+  const wb = wa + Math.PI;
+  const near = (a) => Math.abs(Math.atan2(Math.sin(a - windYaw), Math.cos(a - windYaw)));
+  windYaw = near(wa) <= near(wb) ? wa : wb;
+  stage.windYaw = windYaw;
   stage.update(sdt);
   director.update(dt, stage.focus, !paused);
   renderer.render(scene, camera);

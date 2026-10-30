@@ -3,7 +3,7 @@
 import * as THREE from "three";
 import { fileOf, rankOf } from "../engine/xiangqi.js";
 import { toWorld, traySlot } from "../render/world.js";
-import { createFigure, idle } from "../render/figures.js";
+import { createFigure, idle, flagTo, flutter } from "../render/figures.js";
 import { Body, World, ballistic, GRAVITY } from "./physics.js";
 import { Effects } from "./fx.js";
 
@@ -46,6 +46,8 @@ export class Stage {
     this.listeners = [];
     this.time = 0;
     this.wind = 1;
+    this.windYaw = null;
+    this.movers = new Set();
   }
 
   on(fn) {
@@ -102,7 +104,7 @@ export class Stage {
     this.world.standing = [...this.actors.values()].filter((a) => !a.userData.moving).map((a) => ({ position: a.position, actor: a }));
     if (dt > 0) this.world.step(dt);
     for (const a of this.actors.values()) {
-      if (dt > 0) idle(a, this.time, dt, this.wind);
+      if (dt > 0) idle(a, this.time, dt, this.wind, this.windYaw);
       // 给路过的棋子让位后，弹回原位
       const u = a.userData;
       if (!u.moving && u.home) {
@@ -114,6 +116,12 @@ export class Stage {
         u.body.position.y = 0.16 + Math.abs(Math.sin(this.time * 9 + u.phase)) * 0.04 * u.march;
       }
     }
+    // 正在走的棋子旗子也照常飘
+    if (dt > 0)
+      for (const a of this.movers) {
+        flagTo(a, dt, this.windYaw);
+        flutter(a.userData.flag, this.time, this.wind);
+      }
     this.fx.update(dt);
   }
 
@@ -132,6 +140,7 @@ export class Stage {
     const end = toWorld(fileOf(entry.to), rankOf(entry.to));
     const u = actor.userData;
     u.moving = true;
+    this.movers.add(actor);
     this.focus = { kind: "move", actor, from: start, to: end, capture: !!target, type };
     this.emit({ type: "move-start", entry, actor });
 
@@ -151,8 +160,11 @@ export class Stage {
     u.home = end.clone();
     u.offset.set(0, 0, 0);
     u.moving = false;
+    this.movers.delete(actor);
     this.actors.set(entry.to, actor);
-    this.focus = { kind: entry.check ? "check" : "settle", actor, at: end, check: entry.check };
+    let king = null;
+    if (entry.check) for (const o of this.actors.values()) if (o.userData.code === (entry.side === "r" ? "b" : "r") + "K") king = o.position.clone();
+    this.focus = { kind: entry.check && king ? "check" : "settle", actor, at: end, check: entry.check, king };
     this.emit({ type: "move-end", entry, actor });
     // 等被吃的子倒地并被收走
     while (this.loose.length) yield;

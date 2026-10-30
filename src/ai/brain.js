@@ -1,7 +1,7 @@
 // 决定下哪一步：开局库 → 搜索 → 温度 softmax → 偶尔的失误与弃子。只会从合法走法里选。
 import { RED, BLACK, legalMoves, notate, other, apply, revert, attacked, rankOf, fileOf } from "../engine/xiangqi.js";
-import { searchRoot, MATE } from "./search.js";
-import { evaluate, NEUTRAL, VALUE } from "./evaluate.js";
+import { searchRoot, settledScore, MATE } from "./search.js";
+import { VALUE } from "./evaluate.js";
 
 export const PERSONAS = [
   { key: "cannon", name: "激进炮手", weights: { material: 1, position: 1, mobility: 1, defense: 0.8, attack: 1.5, rookRush: 0.3, cannonCenter: 1.2 }, risk: 0.3, books: { r: ["当头炮", "过宫炮"], b: ["顺炮", "卒底炮"] } },
@@ -28,11 +28,17 @@ export function createArmy(rng, color) {
   return { color, persona, book, bookIndex: 0, bookMisses: 0, announced: false };
 }
 
-// 胜率：中性评估的 S 形映射，红方视角
-export function winRate(board) {
-  const s = evaluate(board, RED, NEUTRAL);
-  return 1 / (1 + Math.exp(-s / 380));
+// 胜率：把眼前的吃子交换算完后的中性估值，映射成红方胜率
+export function winRate(board, side) {
+  const s = settledScore(board, side);
+  if (s > MATE / 2) return 0.995;
+  if (s < -MATE / 2) return 0.005;
+  return 1 / (1 + Math.exp(-s / 420));
 }
+
+// 温度 → softmax 的「分差容忍度」：低温几乎只走最好的，高温才会在接近的几步间游移
+export const tauOf = (t) => 6 + t * t * 160;
+export const marginOf = (t) => (t <= 0.001 ? 0 : Math.max(40 + t * 260, 170));
 
 function bookMove(state, army, rng) {
   const book = BOOKS[army.book];
@@ -68,7 +74,7 @@ export function* think(state, army, rng, { temperature = 0.35, depth = 3 } = {})
     army.announced = true;
     return { move: book, kind: "book", book: army.book, first, roots: null };
   }
-  const { roots, nodes } = yield* searchRoot(state, { depth, persona: army.persona.weights });
+  const { roots, nodes } = yield* searchRoot(state, { depth, persona: army.persona.weights, margin: marginOf(temperature) });
   if (!roots.length) return null;
   const best = roots[0].score;
   // 已经能将死，或者马上被将死：不再随机
@@ -84,13 +90,13 @@ export function* think(state, army, rng, { temperature = 0.35, depth = 3 } = {})
   if (rng.chance(army.persona.risk * 0.12 * (0.5 + temperature))) {
     const enemyPalaceY = color === RED ? 8 : 1;
     const sac = roots.find(
-      (r) => r.score > best - 160 && !r.move.captured && VALUE[r.move.piece[1]] >= 270 && Math.abs(rankOf(r.move.to) - enemyPalaceY) <= 2 && Math.abs(fileOf(r.move.to) - 4) <= 2 && hanging(state.board, r.move),
+      (r) => r.exact && r.score > best - 160 && !r.move.captured && VALUE[r.move.piece[1]] >= 270 && Math.abs(rankOf(r.move.to) - enemyPalaceY) <= 2 && Math.abs(fileOf(r.move.to) - 4) <= 2 && hanging(state.board, r.move),
     );
     if (sac) return { move: sac.move, kind: "sacrifice", roots, nodes };
   }
   // 温度 softmax：在若干个最好的走法里按分数加权抽一个
-  const tau = 15 + temperature * 140;
-  const top = roots.filter((r) => r.score > best - 320).slice(0, 7);
+  const tau = tauOf(temperature);
+  const top = roots.filter((r) => r.exact && r.score > best - marginOf(temperature)).slice(0, 6);
   const weights = top.map((r) => Math.exp((r.score - best) / tau));
   const sum = weights.reduce((a, b) => a + b, 0);
   let u = rng() * sum;

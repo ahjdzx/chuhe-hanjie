@@ -288,11 +288,12 @@ export function createFigure(code) {
   const parts = BUILDERS[type](a, sway);
 
   // 背后插旗
-  const flagH = type === "K" ? 0.95 : 0.78;
+  const flagH = type === "K" ? 1.08 : 0.9;
   const pole = mesh(cyl(0.012, 0.012, flagH, 6), mat(WOOD), -0.2, flagH / 2, -0.16);
   sway.add(pole);
-  const flag = makeFlag(color, type, type === "K" ? 0.34 : 0.24, type === "K" ? 0.26 : 0.19);
-  flag.position.set(-0.2, flagH - (type === "K" ? 0.15 : 0.11), -0.16);
+  const fw = type === "K" ? 0.42 : 0.31, fh = type === "K" ? 0.33 : 0.25;
+  const flag = makeFlag(color, type, fw, fh);
+  flag.position.set(-0.2, flagH - fh / 2 - 0.02, -0.16);
   flag.rotation.y = -0.35;
   sway.add(flag);
   sway.add(mesh(sph(0.022, 8), mat(a.trim, 0.3, 0.6), -0.2, flagH + 0.01, -0.16));
@@ -304,7 +305,18 @@ export function createFigure(code) {
 }
 
 // 待机：呼吸、轻摇、旗帜飘动；被碰到时摇晃一下（弹簧）
-export function idle(actor, t, dt, wind = 1) {
+// 旗面顺风展开：风向垂直于镜头视线时，旗面正对镜头
+export function flagTo(actor, dt, windYaw) {
+  if (windYaw === null || windYaw === undefined) return;
+  const fl = actor.userData.flag;
+  let d = windYaw - actor.rotation.y - fl.rotation.y;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  fl.rotation.y += d * (1 - Math.exp(-dt * 2.5));
+}
+
+export function idle(actor, t, dt, wind = 1, windYaw = null) {
+  flagTo(actor, dt, windYaw);
   const u = actor.userData;
   const s = 1 + Math.sin(t * 2.1 + u.phase) * 0.018;
   u.sway.scale.y = (u.type === "K" ? 1.12 : u.type === "P" ? 0.92 : 1) * s;
