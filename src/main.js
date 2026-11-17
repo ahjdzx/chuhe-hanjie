@@ -1,4 +1,10 @@
-// 总控：规则引擎决定，AI 选择，演出层表演，导播拍摄。各层只通过走法记录交流。
+/**
+ * [INPUT]: 依赖 engine 的自检与走法、game/match 的对局入口、ai/rng 的种子、render 的场景与导播、sim 的演出舞台
+ * [OUTPUT]: 无导出。页面入口；在 window.__xq 上留一个调试把手
+ * [POS]: 总控。回合流程：引擎决定 → AI 选择 → 演出 → 导播。各层只通过走法记录交流。
+ *        适配屏幕也在这里：视野随宽高比变、轻点才算落子、窄屏默认收起设置。
+ * [PROTOCOL]: Update this header on change, then check CLAUDE.md
+ */
 import * as THREE from "three";
 import { selfTest, legalMoves, fileOf, rankOf, sq } from "./engine/xiangqi.js";
 import { createMatch, decide, commit, startTurn, branch } from "./game/match.js";
@@ -15,6 +21,7 @@ if (test.ok) console.info(`[象棋自检] 通过：初始局面红方合法走�
 else {
   console.error(`[象棋自检] 失败：初始局面红方合法走法 ${test.count} 个，应为 ${test.expected}`);
   $("selftest").className = "badge fail";
+  $("selftest").title = "规则引擎自检失败";
   $("selftest").textContent = `自检失败 ${test.count}/${test.expected}`;
 }
 
@@ -26,10 +33,14 @@ const director = new Director(camera, canvas);
 director.obstacles = () => [...stage.actors.values()];
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
+// 竖屏时把垂直视野撑大，让水平视野不小于 6:5 画面时的宽度；否则手机上只剩一条窄缝，全是特写
+const FOV = { base: 38, aspect: 1.2, max: 78 };
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
+  const half = Math.tan(THREE.MathUtils.degToRad(FOV.base / 2));
+  camera.fov = camera.aspect >= FOV.aspect ? FOV.base : Math.min(FOV.max, THREE.MathUtils.radToDeg(2 * Math.atan((half * FOV.aspect) / camera.aspect)));
   camera.updateProjectionMatrix();
 }
 window.addEventListener("resize", resize);
@@ -126,14 +137,21 @@ function userChanged() {
   }
 }
 $("btn-pause").onclick = () => setPaused(!paused);
-$("btn-fold").onclick = () => {
-  const panel = $("controls");
-  panel.classList.toggle("folded");
-  $("btn-fold").textContent = panel.classList.contains("folded") ? "设置" : "收起";
+function setFolded(folded) {
+  $("controls").classList.toggle("folded", folded);
+  $("btn-fold").textContent = folded ? "设置" : "收起";
+}
+$("btn-fold").onclick = () => setFolded(!$("controls").classList.contains("folded"));
+// 设置面板默认收起，把画面让给棋盘。窄屏上棋谱做成抽屉，和设置面板不同时展开
+setFolded(true);
+$("btn-record").onclick = () => {
+  if ($("record").classList.toggle("open")) setFolded(true);
 };
+$("btn-fold").addEventListener("click", () => $("record").classList.remove("open"));
 function setPaused(p) {
   paused = p;
   $("btn-pause").textContent = paused ? "继续" : "暂停";
+  $("btn-pause").setAttribute("aria-pressed", String(paused));
   status(paused ? "已暂停" : "");
 }
 $("speed").oninput = (e) => {
@@ -190,8 +208,15 @@ function markAt(s, color, r = 0.48) {
   marks.add(m);
 }
 const ray = new THREE.Raycaster();
+// 轻点才算落子：按下和抬起几乎在同一处。拖动是在转镜头（触屏上尤其如此），不能误选棋子
+let press = null;
 canvas.addEventListener("pointerdown", (e) => {
-  if (e.button !== 0 || phase !== "human" || paused) return;
+  press = e.button === 0 ? { x: e.clientX, y: e.clientY, at: performance.now() } : null;
+});
+canvas.addEventListener("pointerup", (e) => {
+  const tap = press && Math.hypot(e.clientX - press.x, e.clientY - press.y) < 10 && performance.now() - press.at < 600;
+  press = null;
+  if (!tap || phase !== "human" || paused) return;
   const ndc = new THREE.Vector2((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
   ray.setFromCamera(ndc, camera);
   const hit = ray.intersectObject(pickPlane)[0];
@@ -345,6 +370,7 @@ window.__xq = {
     const v = toWorld(x, y).project(camera);
     return [(v.x + 1) / 2, (1 - v.y) / 2];
   },
+  get drawn() { return { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, fov: Math.round(camera.fov) }; },
   fps() {
     return new Promise((res) => {
       let n = 0;

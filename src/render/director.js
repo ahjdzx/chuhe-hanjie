@@ -1,6 +1,16 @@
-// 自动导播：根据演出层的焦点选镜头，用临界阻尼弹簧平滑推拉；也支持自由视角和俯视。
+/**
+ * [INPUT]: 依赖 three 与 OrbitControls；读取演出层给的 focus（只读）和相机当前的视野、宽高比
+ * [OUTPUT]: 导出 Director（setMode 三种模式 auto/free/top、update、obstacles 回调、onUserTakeover 回调）
+ * [POS]: render 的摄影师。演出层只说「现在发生什么」（focus），机位怎么摆由它决定；用临界阻尼弹簧平滑推拉。
+ *        机位是照 16:10 横屏调的；竖屏时俯视按屏宽算高度，待机只在红方身后左右摆，跟拍沿视线拉远。
+ * [PROTOCOL]: Update this header on change, then check CLAUDE.md
+ */
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+// 俯视：高度按画面算，刚好装下。纵向连上下界面留的边一起装（横屏下与原先固定的 19 高相同）；横向在宽屏上连两侧托盘一起装，竖屏上只保棋盘
+const TOP = { depth: 13.1, wide: 17.4, narrow: 10.2, lean: 0.105, look: new THREE.Vector3(0, 0, 0.2) };
+const WIDE = Math.tan((19 * Math.PI) / 180) * 1.6; // 调机位时（16:10、38° 视野）水平半视角的正切
 
 class Spring3 {
   constructor(v) {
@@ -42,6 +52,10 @@ export class Director {
     dom.addEventListener("wheel", () => {
       if (this.mode === "auto") this.setMode("free");
     });
+    // 触屏没有右键和滚轮：双指一碰就交给自由视角（单指留给点棋子）
+    dom.addEventListener("touchstart", (e) => {
+      if (this.mode === "auto" && e.touches.length >= 2) this.setMode("free");
+    }, { passive: true });
   }
 
   setMode(mode) {
@@ -134,9 +148,14 @@ export class Director {
       return;
     }
     let eye, look, time = 1.1;
+    // 水平、垂直半视角的正切。竖屏比调机位时窄：跟拍和特写沿视线拉远一些（封顶 1.25 倍），免得主体挤出画面
+    const tanV = Math.tan((this.camera.fov * Math.PI) / 360), tanH = tanV * this.camera.aspect;
+    const pullBack = Math.min(1.25, Math.max(1, WIDE / tanH));
+    let pull = 1;
     if (this.mode === "top") {
-      eye = new THREE.Vector3(0, 19, 2.2);
-      look = new THREE.Vector3(0, 0, 0.2);
+      const height = Math.max(TOP.depth / (2 * tanV), (this.camera.aspect > 1 ? TOP.wide : TOP.narrow) / (2 * tanH));
+      eye = new THREE.Vector3(0, height, TOP.look.z + height * TOP.lean);
+      look = TOP.look;
       time = 0.6;
     } else {
       this.orbit += dt * (playing ? 0.05 : 0.12);
@@ -160,23 +179,27 @@ export class Director {
         eye = anchor.clone().add(c.offset);
         look = anchor.clone().addScaledVector(c.lead, 0.6).add(new THREE.Vector3(0, 0.35, 0));
         time = c.time;
+        pull = pullBack;
       } else if (c && c.eye) {
         eye = c.eye;
         look = c.stone && f.stone ? c.look.clone().lerp(f.stone, 0.3) : c.look;
         time = c.time;
+        pull = pullBack;
       } else if (f.kind === "over" && f.at) {
         const r = 6;
         eye = new THREE.Vector3(f.at.x + Math.sin(this.orbit * 3) * r, 4.2, f.at.z + Math.cos(this.orbit * 3) * r);
         look = f.at.clone().add(new THREE.Vector3(0, 0.5, 0));
         time = 1.2;
       } else {
+        // 横屏绕桌一圈；竖屏只在红方身后左右摆：转到侧面，棋盘就只剩一小条
         const r = 13.5;
-        eye = new THREE.Vector3(Math.sin(this.orbit) * r * 0.55, 11.5, Math.cos(this.orbit) * r);
+        const az = this.camera.aspect < 1 ? Math.sin(this.orbit) * 0.5 : this.orbit;
+        eye = new THREE.Vector3(Math.sin(az) * r * 0.55, 11.5, Math.cos(az) * r);
         look = new THREE.Vector3(0, 0, 0);
         time = f.kind === "settle" ? 1.6 : 1.3;
       }
       // 机位始终留在桌面上空，并保持足够的俯角
-      eye = eye.clone();
+      eye = look.clone().addScaledVector(eye.clone().sub(look), pull);
       eye.x = Math.max(-10.5, Math.min(10.5, eye.x));
       eye.z = Math.max(-12, Math.min(12, eye.z));
       const horiz = Math.hypot(eye.x - look.x, eye.z - look.z);

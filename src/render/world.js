@@ -1,4 +1,10 @@
-// 场景：低矮漆木桌、真实棋盘、两侧收子托盘、灯光。只负责「看起来」，不碰对局状态。
+/**
+ * [INPUT]: 依赖 three
+ * [OUTPUT]: 尺寸常量 BOARD_W/BOARD_D/BOARD_T/TABLE/TRAY_X；坐标换算 toWorld/fromWorld/groundAt/traySlot；场景工厂 createWorld
+ * [POS]: render 的地基。低矮漆木桌、真实棋盘、两侧收子托盘、灯光。只负责「看起来」，不碰对局状态。
+ *        触屏设备（pointer: coarse）自动降一档像素比和阴影贴图。
+ * [PROTOCOL]: Update this header on change, then check CLAUDE.md
+ */
 import * as THREE from "three";
 
 export const BOARD_W = 9.6; // x: -4.8 .. 4.8
@@ -114,7 +120,9 @@ function lacquer(color, rough = 0.32) {
 
 export function createWorld(canvas) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+  // 触屏设备（手机、平板）降一档：像素比和阴影贴图是片元开销的大头，屏小了肉眼差别不大
+  const lite = window.matchMedia("(pointer: coarse)").matches;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, lite ? 1.5 : 1.75));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -133,7 +141,7 @@ export function createWorld(canvas) {
   const key = new THREE.DirectionalLight("#ffe2b8", 2.4);
   key.position.set(-7, 16, 9);
   key.castShadow = true;
-  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.mapSize.set(lite ? 1024 : 2048, lite ? 1024 : 2048);
   const sc = key.shadow.camera;
   sc.left = -11;
   sc.right = 11;

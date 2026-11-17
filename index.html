@@ -2,64 +2,73 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>楚河汉界 · 桌面对战</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%235a1d14'/><text x='32' y='46' font-size='40' text-anchor='middle' fill='%23e9c46a' font-family='serif'>帥</text></svg>" />
     <link rel="stylesheet" href="/src/ui/style.css" />
   </head>
   <body>
-    <canvas id="scene"></canvas>
+    <canvas id="scene" aria-label="象棋棋盘"></canvas>
 
-    <div id="winbar" aria-label="胜率">
+    <div id="winbar" role="img" aria-label="胜率">
       <span class="side red" id="win-red">红 50%</span>
       <div class="bar"><div class="fill" id="win-fill"></div><div class="mid"></div></div>
       <span class="side black" id="win-black">黑 50%</span>
     </div>
 
-    <section class="panel left" id="controls">
+    <section class="panel left" id="controls" aria-label="设置">
       <header>
+        <span class="seal" aria-hidden="true">帥</span>
         <h1>楚河汉界</h1>
-        <span id="selftest" class="badge ok" title="规则引擎自检">自检 ✓</span>
-        <button id="btn-fold" class="fold" title="收起/展开设置">收起</button>
+        <span id="selftest" class="badge ok" title="规则引擎自检通过"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6.4l2.4 2.4 4.6-5.3" /></svg>自检</span>
+        <button id="btn-record" class="ghost narrow-only" title="棋谱">棋谱</button>
+        <button id="btn-fold" class="ghost" title="收起/展开设置">收起</button>
       </header>
       <div class="row seed">
-        <span>种子</span><code id="seed">------</code>
+        <span class="k">种子</span><code id="seed">------</code>
         <button id="btn-new">新种子</button>
-        <button id="btn-replay">重放该种子</button>
+        <button id="btn-replay" title="按原局的设置改动和你的走法精确重放">重放</button>
       </div>
-      <div class="row">
-        <button id="btn-pause" class="primary">暂停</button>
+      <div class="row play">
+        <button id="btn-pause" class="primary" aria-pressed="false">暂停</button>
         <label class="check"><input type="checkbox" id="auto-next" checked />打完自动开新局</label>
       </div>
       <div class="more">
-      <label class="slider">速度 <input type="range" id="speed" min="0.25" max="3" step="0.05" value="1" /><output id="speed-out">1.0×</output></label>
-      <label class="slider">温度 <input type="range" id="temp" min="0" max="1" step="0.01" value="0.35" /><output id="temp-out">0.35</output></label>
-      <div class="row">
-        <label>搜索深度
-          <select id="depth"><option value="2">2</option><option value="3" selected>3</option><option value="4">4（更强）</option></select>
-        </label>
-        <label>镜头
-          <select id="camera"><option value="auto" selected>自动导播</option><option value="free">自由视角</option><option value="top">俯视</option></select>
-        </label>
-      </div>
-      <div class="row">
-        <label>红方 <select id="ctl-r"><option value="ai" selected>电脑</option><option value="human">我来下</option></select></label>
-        <label>黑方 <select id="ctl-b"><option value="ai" selected>电脑</option><option value="human">我来下</option></select></label>
-      </div>
-      <p class="hint">右键拖动或滚轮可随时切到自由视角。轮到你时，点己方棋子再点目标点。空格暂停。</p>
+        <label class="slider"><span>速度</span><input type="range" id="speed" min="0.25" max="3" step="0.05" value="1" /><output id="speed-out">1.0×</output></label>
+        <label class="slider"><span>温度</span><input type="range" id="temp" min="0" max="1" step="0.01" value="0.35" /><output id="temp-out">0.35</output></label>
+        <div class="fields">
+          <label class="field"><span>搜索深度</span>
+            <select id="depth"><option value="2">2</option><option value="3" selected>3</option><option value="4">4（更强）</option></select>
+          </label>
+          <label class="field"><span>镜头</span>
+            <select id="camera"><option value="auto" selected>自动导播</option><option value="free">自由视角</option><option value="top">俯视</option></select>
+          </label>
+          <label class="field red"><span>红方</span>
+            <select id="ctl-r"><option value="ai" selected>电脑</option><option value="human">我来下</option></select>
+          </label>
+          <label class="field black"><span>黑方</span>
+            <select id="ctl-b"><option value="ai" selected>电脑</option><option value="human">我来下</option></select>
+          </label>
+        </div>
+        <details class="hint">
+          <summary>玩法提示</summary>
+          <p>把红方或黑方切到「我来下」就能接管。轮到你时，点己方棋子，再点目标点。</p>
+          <p>右键拖动或滚轮切到自由视角，空格暂停。触屏上双指一碰切到自由视角，单指转、双指缩放。</p>
+        </details>
       </div>
     </section>
 
-    <section class="panel right" id="record">
+    <section class="panel right" id="record" aria-label="棋谱">
       <div class="armies">
         <div class="army red"><b>红方</b><span id="army-r">—</span></div>
         <div class="army black"><b>黑方</b><span id="army-b">—</span></div>
       </div>
-      <div id="status" class="status">准备开局</div>
+      <div id="status" class="status" role="status">准备开局</div>
       <ol id="moves" class="moves"></ol>
     </section>
 
-    <div id="comment" class="comment"><span id="comment-text">桌上的两支军队已经列好阵</span><small id="comment-sub"></small></div>
-    <div id="banner" class="banner hidden"><div class="title" id="banner-title"></div><div class="sub" id="banner-sub"></div></div>
+    <div id="comment" class="comment" aria-live="polite"><span id="comment-text">桌上的两支军队已经列好阵</span><small id="comment-sub"></small></div>
+    <div id="banner" class="banner hidden"><div class="title" id="banner-title"></div><div class="rule"></div><div class="sub" id="banner-sub"></div></div>
 
     <script type="module" src="/src/main.js"></script>
   </body>
