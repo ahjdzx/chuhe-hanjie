@@ -21,39 +21,49 @@
         <span class="seal" aria-hidden="true">帥</span>
         <h1>楚河汉界</h1>
         <span id="selftest" class="badge ok" title="规则引擎自检通过"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6.4l2.4 2.4 4.6-5.3" /></svg>自检</span>
-        <button id="btn-record" class="ghost narrow-only" title="棋谱">棋谱</button>
-        <button id="btn-fold" class="ghost" title="收起/展开设置">收起</button>
+        <button id="btn-record" class="ghost narrow-only" title="棋谱">战报</button>
+        <button id="btn-fold" class="ghost" title="收起/展开设置">收起来</button>
       </header>
       <div class="row seed">
         <span class="k">种子</span><code id="seed">------</code>
-        <button id="btn-new">新种子</button>
-        <button id="btn-replay" title="按原局的设置改动和你的走法精确重放">重放</button>
+        <button id="btn-new">新一局</button>
+        <button id="btn-replay" title="按原局的设置改动和你的走法精确重放">重演一遍</button>
       </div>
       <div class="row play">
         <button id="btn-pause" class="primary" aria-pressed="false">暂停</button>
-        <label class="check"><input type="checkbox" id="auto-next" checked />打完自动开新局</label>
+        <label class="check"><input type="checkbox" id="auto-next" checked />下完自动开下一局</label>
       </div>
       <div class="more">
         <label class="slider"><span>速度</span><input type="range" id="speed" min="0.25" max="3" step="0.05" value="1" /><output id="speed-out">1.0×</output></label>
-        <label class="slider"><span>温度</span><input type="range" id="temp" min="0" max="1" step="0.01" value="0.35" /><output id="temp-out">0.35</output></label>
+        <label class="slider" title="电脑走棋有多爱冒险：越往右越容易走错，也越容易抓住机会"><span>爱冒险</span><input type="range" id="temp" min="0" max="1" step="0.01" value="0.35" /><output id="temp-out">稳重</output></label>
         <div class="fields">
-          <label class="field"><span>搜索深度</span>
-            <select id="depth"><option value="2">2</option><option value="3" selected>3</option><option value="4">4（更强）</option></select>
+          <label class="field"><span>电脑多厉害</span>
+            <select id="depth"><option value="2">2 一般</option><option value="3" selected>3 厉害</option><option value="4">4 特别厉害（更慢）</option></select>
           </label>
-          <label class="field"><span>镜头</span>
-            <select id="camera"><option value="auto" selected>自动导播</option><option value="free">自由视角</option><option value="top">俯视</option></select>
+          <label class="field"><span>看棋的角度</span>
+            <select id="camera"><option value="auto" selected>自动跟着看</option><option value="free">自己转着看</option><option value="top">从上往下看</option></select>
           </label>
           <label class="field red"><span>红方</span>
-            <select id="ctl-r"><option value="ai" selected>电脑</option><option value="human">我来下</option></select>
+            <select id="ctl-r"><option value="ai" selected>电脑下</option><option value="human">我来下</option></select>
           </label>
           <label class="field black"><span>黑方</span>
-            <select id="ctl-b"><option value="ai" selected>电脑</option><option value="human">我来下</option></select>
+            <select id="ctl-b"><option value="ai" selected>电脑下</option><option value="human">我来下</option></select>
           </label>
         </div>
         <details class="hint">
-          <summary>玩法提示</summary>
-          <p>把红方或黑方切到「我来下」就能接管。轮到你时，点己方棋子，再点目标点。</p>
-          <p>右键拖动或滚轮切到自由视角，空格暂停。触屏上双指一碰切到自由视角，单指转、双指缩放。</p>
+          <summary>玩法提示 · 小朋友版</summary>
+          <p>把红方或黑方换成「我来下」，就能亲手下啦。轮到你时：先点自己的棋子，再点它要去的地方——绿圈能走，红圈有敌人。</p>
+          <p>鼠标右键拖一拖可以转桌子，滚轮可以拉远拉近，按空格键暂停。手机上用手指转、双指缩放。</p>
+        </details>
+        <details class="hint rules">
+          <summary>象棋规则 · 小朋友版</summary>
+          <div class="roles">
+            <i>帥將</i><i>仕士</i><i>相象</i><i>馬马</i><i>車车</i><i>炮砲</i><i>兵卒</i>
+          </div>
+          <p>把对方的帥（或將）吃掉，你就赢啦！它只能在自己的小院子里走一格。</p>
+          <p>仕和相是保镖：仕在小院里斜走一格，相走「田」字，不能过河。馬走「日」字，被别的棋子搬到腿就跳不动啦。</p>
+          <p>車最厉害，像小汽车一样直开，想开多远就开多远。炮直走，但吃子要隔一个棋子「跳」过去。</p>
+          <p>兵（卒）只能往前走，过了河还能左右走，一次一格。走到哪里都记得：将军啦，就要赶紧护住自己的帥哦！</p>
         </details>
       </div>
     </section>
@@ -63,12 +73,14 @@
         <div class="army red"><b>红方</b><span id="army-r">—</span></div>
         <div class="army black"><b>黑方</b><span id="army-b">—</span></div>
       </div>
-      <div id="status" class="status" role="status">准备开局</div>
+      <div id="status" class="status" role="status">棋子站好队，马上开战</div>
       <ol id="moves" class="moves"></ol>
     </section>
 
     <div id="comment" class="comment" aria-live="polite"><span id="comment-text">桌上的两支军队已经列好阵</span><small id="comment-sub"></small></div>
-    <div id="banner" class="banner hidden"><div class="title" id="banner-title"></div><div class="rule"></div><div class="sub" id="banner-sub"></div></div>
+    <div id="end" class="end hidden"><div class="banner"><div class="title" id="banner-title"></div><div class="rule"></div><div class="sub" id="banner-sub"></div>
+      <div class="after"><button id="btn-again" class="primary">再来一盘</button><button id="btn-review" class="ghost">回看棋盘</button></div>
+    </div></div>
 
     <script type="module" src="/src/main.js"></script>
   </body>

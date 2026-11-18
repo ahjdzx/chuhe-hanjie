@@ -3,6 +3,7 @@
  * [OUTPUT]: 无导出。页面入口；在 window.__xq 上留一个调试把手
  * [POS]: 总控。回合流程：引擎决定 → AI 选择 → 演出 → 导播。各层只通过走法记录交流。
  *        适配屏幕也在这里：视野随宽高比变、轻点才算落子、窄屏默认收起设置。
+ *        界面文案是小朋友版：按钮、菜单、终局弹窗与状态栏都说大白话，终局原因在显示时翻译。
  * [PROTOCOL]: Update this header on change, then check CLAUDE.md
  */
 import * as THREE from "three";
@@ -14,6 +15,18 @@ import { Stage } from "./sim/show.js";
 import { Director } from "./render/director.js";
 
 const $ = (id) => document.getElementById(id);
+// 终局原因的大白话：引擎里的原因是给测试和棋谱看的，弹窗上说小朋友听得懂的话
+const KID_REASON = (r) =>
+  r === "将被吃" ? "帥（將）被吃掉啦"
+  : /将死/.test(r) ? "对方的帥（將）逃不掉啦"
+  : /困毙/.test(r) ? "对方一个能走的棋子都没有啦"
+  : /重复/.test(r) ? "双方把一样的棋走了一遍又一遍，算平局"
+  : /无吃子/.test(r) ? "好久好久都没吃子，握握手算平局"
+  : /上限/.test(r) ? "这盘棋下得太长啦，算平局"
+  : r;
+// 「爱冒险」滑杆的大白话档位：数值是给行家看的，小朋友只看词
+const tempWord = (t) =>
+  t < 0.15 ? "特别稳重" : t < 0.35 ? "稳重" : t < 0.6 ? "有点冒险" : t < 0.85 ? "爱冒险" : "特别爱冒险";
 
 // ---- 自检 ---------------------------------------------------------------------------
 const test = selfTest();
@@ -73,7 +86,7 @@ function newGame(s, script = null) {
   $("army-b").textContent = `${match.armies.b.persona.name} · 偏好${match.armies.b.book}`;
   setWin(0.5);
   say(script ? `重放种子 ${seed}` : `新的一局，种子 ${seed}`, script && script.events.length ? `按原局的 ${script.events.length} 处设置改动和你的走法精确重放` : `红方 ${match.armies.r.persona.name}，黑方 ${match.armies.b.persona.name}`);
-  $("banner").classList.add("hidden");
+  $("end").classList.add("hidden");
   thinker = null;
   ready = null;
   clearMarks();
@@ -120,26 +133,32 @@ function addMove(rec) {
 
 $("btn-new").onclick = () => newGame(freshSeed());
 $("btn-replay").onclick = () => newGame(seed, match.script);
+// 终局弹窗：点空白处或「回看棋盘」都能收起，留在终局局面慢慢看
+$("btn-again").onclick = () => newGame(freshSeed());
+$("btn-review").onclick = () => $("end").classList.add("hidden");
+$("end").onclick = (e) => {
+  if (e.target.id === "end") $("end").classList.add("hidden");
+};
 
 // 界面显示某组设置（重放时跟随原局）
 function showSettings(st) {
   settings.temperature = st.temperature;
   settings.depth = st.depth;
   $("temp").value = String(st.temperature);
-  $("temp-out").textContent = st.temperature.toFixed(2);
+  $("temp-out").textContent = tempWord(st.temperature);
   $("depth").value = String(st.depth);
 }
 // 重放途中用户自己改了东西：从这里起按新的来
 function userChanged() {
   if (match?.replay) {
     branch(match);
-    status("已偏离重放，从这里起按你的设置继续");
+    status("已偏离重放，从这一步起按现在的玩法继续");
   }
 }
 $("btn-pause").onclick = () => setPaused(!paused);
 function setFolded(folded) {
   $("controls").classList.toggle("folded", folded);
-  $("btn-fold").textContent = folded ? "设置" : "收起";
+  $("btn-fold").textContent = folded ? "设置" : "收起来";
 }
 $("btn-fold").onclick = () => setFolded(!$("controls").classList.contains("folded"));
 // 设置面板默认收起，把画面让给棋盘。窄屏上棋谱做成抽屉，和设置面板不同时展开
@@ -152,7 +171,7 @@ function setPaused(p) {
   paused = p;
   $("btn-pause").textContent = paused ? "继续" : "暂停";
   $("btn-pause").setAttribute("aria-pressed", String(paused));
-  status(paused ? "已暂停" : "");
+  status(paused ? "暂停啦，点「继续」或按空格键接着下" : "");
 }
 $("speed").oninput = (e) => {
   speed = Number(e.target.value);
@@ -160,7 +179,7 @@ $("speed").oninput = (e) => {
 };
 $("temp").oninput = (e) => {
   settings.temperature = Number(e.target.value);
-  $("temp-out").textContent = settings.temperature.toFixed(2);
+  $("temp-out").textContent = tempWord(settings.temperature);
   userChanged(); // 新设置从下一回合开始生效，并记进对局脚本
 };
 $("depth").onchange = (e) => {
@@ -252,22 +271,22 @@ function beginTurn() {
   if (replaying) showSettings(match.settings);
   if (scripted) {
     // 重放原局里人类下的那一步
-    status("重放：当时你下的这一步");
+    status("重放：这一步是当时你下的");
     ready = { choice: scripted, at: performance.now() + 700 / speed };
     phase = "ready";
     return;
   }
-  if (replaying && !match.replay) status("重放结束，接着按当前设置下");
+  if (replaying && !match.replay) status("重放完啦，接着往下下");
   // 重放进行中：原局由电脑下的步照样交给电脑，保证逐步一致
   if (control[side] === "human" && !match.replay) {
     phase = "human";
-    status(`轮到你走${side === "r" ? "红" : "黑"}方：点己方棋子，再点目标点`);
+    status("轮到你走啦：先点自己的棋子，再点它要去的地方");
     return;
   }
   phase = "think";
   thinker = decide(match);
   thinkStart = performance.now();
-  status(`${side === "r" ? "红" : "黑"}方思考中…`);
+  status(`${side === "r" ? "红" : "黑"}方在想怎么走…`);
 }
 
 function stepThinker(budget) {
@@ -285,7 +304,7 @@ function stepThinker(budget) {
 function play(choice) {
   const rec = commit(match, choice);
   addMove(rec);
-  say(rec.comment, rec.replayed ? "重放你当时的走法" : rec.kind === "book" ? "开局库" : rec.kind === "blunder" ? "高温下的随机失误" : rec.kind === "soft" ? "温度让它选了次优的一步" : "");
+  say(rec.comment, rec.replayed ? "重放你当时的走法" : rec.kind === "book" ? "书本上的经典开局" : rec.kind === "blunder" ? "太爱冒险，走错啦" : rec.kind === "soft" ? "爱冒险让它走了一步不太好的棋" : "");
   setWin(match.winRate);
   status("");
   phase = "show";
@@ -301,12 +320,12 @@ function play(choice) {
 function finish() {
   phase = "over";
   const r = match.result;
-  const title = r.winner ? (r.winner === "r" ? "红方胜" : "黑方胜") : "和棋";
+  const title = r.winner ? (r.winner === "r" ? "红方赢啦" : "黑方赢啦") : "平局啦";
   $("banner-title").textContent = title;
-  $("banner-sub").textContent = `${r.reason} · 共 ${match.log.length} 步 · 种子 ${seed}`;
-  $("banner").classList.remove("hidden");
-  say(`${title}：${r.reason}`);
-  status($("auto-next").checked ? "稍后自动开始新的一局" : "对局结束");
+  $("banner-sub").textContent = `${KID_REASON(r.reason)} · 走了 ${match.log.length} 步 · 种子 ${seed}`;
+  $("end").classList.remove("hidden");
+  say(`${title}：${KID_REASON(r.reason)}`, "下完啦，所有棋子都亮开给大家看");
+  status($("auto-next").checked ? "马上开始新的一局" : "这盘棋下完啦");
   const k = r.winner ? match.state.board.findIndex((p) => p === r.winner + "K") : sq(4, 4);
   stage.focus = { kind: "over", at: toWorld(fileOf(Math.max(0, k)), rankOf(Math.max(0, k))) };
   overTimer = 9;
